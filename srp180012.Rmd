@@ -1,0 +1,188 @@
+---
+title: "ML 4375 Homework 7: Ensemble Learning"
+author: "Supratik Pochampally"
+abstract: The purpose of this notebook  is to try to improve performance for the Census Income dataset from the UCI Machine Learning Repository by using Random Forest, Boosting, AdaBoost, and XGBoost and comparing the speed of the algorithms. 
+
+output:
+  pdf_document: default
+  html_notebook: default
+  html_document:
+    df_print: paged
+---
+
+Let's start by reading in the dataset and cleaning it, as well as split into training and testing data sets the same way we did in Project 2:
+
+```{r}
+# Read in the .csv file of the data set
+df <- read.csv("CensusIncome.csv", header = TRUE)
+df <- df[-c(3, 4, 8, 11, 12, 14)]
+names(df)
+df$workclass <- as.factor(df$workclass)
+df$marital.status <- as.factor(df$marital.status)
+df$occupation <- as.factor(df$occupation)
+df$race <- as.factor(df$race)
+df$sex <- as.factor(df$sex)
+df$income <- as.factor(df$income)
+# Set seed to ensure the same split of training and testing sets
+set.seed(1234)
+# Split the data
+i <- sample(1:nrow(df), nrow(df) * 0.75, replace = FALSE)
+train <- df[i, ]
+test <- df[-i, ]
+```
+
+# a. Random Forest
+
+Let's start by running the Random Forest algorithm:
+
+```{r}
+# Import the randomForest library
+library(randomForest)
+# Set the seed to 1234 to ensure the same output every run
+set.seed(1234)
+# Run the randomForest algorithm
+start1 <- Sys.time()
+rf <- randomForest(income~., data= train, importance = TRUE) 
+end1 <- Sys.time()
+# Print the random forest
+rf
+```
+
+Now let's calculate our accuracy and mcc metrics:
+
+```{r}
+# Import the mltools library
+library(mltools)
+# Predict from the random forest algorithm
+pred1 <- predict(rf, newdata = test, type = "response")
+# Calculate accuracy, mcc, and runtime metrics
+acc1 <- mean(pred1 == test$income)
+mcc1 <- mcc(factor(pred1), test$income)
+runtime1 <- end1 - start1
+# Print metrics
+print(paste("accuracy:", acc1))
+print(paste("mcc:", mcc1))
+print(paste("run time:", runtime1))
+```
+
+# b. Boosting
+
+Let's start by running the Boosting algorithm:
+
+```{r}
+# Import the adabag library
+library(adabag)
+# Set the seed to 1234 to ensure the same output every run
+set.seed(1234)
+# Run the boosting algorithm
+start2 <- Sys.time()
+adab <- boosting(income~., data = train, boos = TRUE, mfinal = 20, coeflearn = 'Breiman') 
+end2 <- Sys.time()
+# Print the summary of the boosting algorithm
+summary(adab)
+```
+
+Now let's calculate our accuracy and mcc metrics:
+
+```{r}
+# Predict from the boosting algorithm
+pred2 <- predict(adab, newdata = test, type = "response")
+# Calculate accuracy, mcc, and runtime metrics
+acc2 <- mean(pred2$class == test$income)
+mcc2 <- mcc(factor(pred2$class), test$income)
+runtime2 <- end2 - start2
+# Print metrics
+print(paste("accuracy:", acc2))
+print(paste("mcc:", mcc2))
+print(paste("run time:", runtime2))
+```
+
+# c. AdaBoost
+
+Let's start by running the AdaBoost algorithm:
+
+```{r}
+# Import the fastAdaboost library
+library(fastAdaboost)
+# Set the seed to 1234 to ensure the same output every run
+set.seed(1234)
+# Run the Adaboosting algorithm
+start3 <- Sys.time()
+fadab <- adaboost(income~., train, 10) 
+end3 <- Sys.time()
+# Print the summary of the Adaboosting algorithm
+summary(fadab)
+```
+
+Now let's calculate our accuracy and mcc metrics:
+
+```{r}
+# Predict from the boosting algorithm
+pred3 <- predict(fadab, newdata = test, type = "response")
+# Calculate accuracy, mcc, and runtime metrics
+acc3 <- mean(pred3$class == test$income)
+mcc3 <- mcc(pred3$class, test$income)
+runtime3 <- end3 - start3
+# Print metrics
+print(paste("accuracy:", acc3))
+print(paste("mcc:", mcc3))
+print(paste("run time:", runtime3))
+```
+
+# d. XGBoost
+
+Let's start by running the XGBoost algorithm:
+
+```{r}
+# Import the xgboost library
+library(xgboost)
+# Assign the training and testing set labels and matrices
+train_label <- ifelse(as.character(train$income) == " >50K", 1, 0)
+test_label <- ifelse(as.character(test$income) == " >50K", 1, 0)
+train_matrix <- data.matrix(train)
+test_matrix <- data.matrix(test)
+# Run the XGBoost algorithm
+start4 <- Sys.time()
+xgmodel <- xgboost(data = train_matrix, label = train_label, nrounds = 100, objective = 'binary:logistic')
+end4 <- Sys.time()
+# Plot the model
+```
+
+Now let's calculate our accuracy and mcc metrics:
+
+```{r}
+# Predict from the boosting algorithm
+probs <- predict(xgmodel, test_matrix) 
+pred4 <- ifelse(probs > 0.5, 1, 0)
+# Calculate accuracy, mcc, and runtime metrics
+acc4 <- mean(pred4 == test_label)
+mcc4 <- mcc(pred4 , test_label)
+runtime4 <- end4 - start4
+# Print metrics
+print(paste("accuracy:", acc4))
+print(paste("mcc:", mcc4))
+print(paste("run time:", runtime4))
+```
+
+# Summary of results
+
+The following ar the accuracy, mcc, and run time values for the four algorithms we ran:
+
+* Random Forest- 
+  + accuracy: 0.839700282520575
+  + mcc: 0.541942930940001
+  + run time: 21.9593360424042
+* Boosting- 
+  + accuracy: 0.831347500307088
+  + mcc: 0.515156520565998
+  + run time: 16.9347229003906
+* AdaBoost-
+  + accuracy: 0.808991524382754
+  + mcc: 0.468052557694284
+  + run time:  5.46624493598938
+* XGBoost-
+  + accuracy: 1
+  + mcc: 1
+  + run time: 0.177515029907227
+
+Looking at the metrics, we can see that the best performing algorithms based on accuracy and mcc values in order are XGBoost, Random Forest, Boosting, and AdaBoost. The fastest algorithms in order are XGBoost, AdaBoost, Boosting, and Random Forest. XGBoost's accuracy of 1 could be because XGBoost was able split hundreds of trees and aggregate them to weigh the best predictors in a way that allowed it to perfectly predict the data. However, this could have occurred because of poor feature selection. In our feature selection process, we tried to pick the features that would help best predict the class of our data, and removed predictors that we deemed were unnecessary or would not be able to help predict from the data. During this process, it was possible that one or two predictors could obviously predict the data, and we did not notice it like XGBoost managed too. This is all just speculation, however, and we may be able to see the better results if we tried using cross-validation or printed and observed the XGBoost tree structure. XGBoost naturally took the least amount of time, as it is able to run faster using multithreading. Random forest took the longest time, but showed the fruits of it's labor through it's performance, with the second best accuracy and mcc values. Similarly, AdaBoost was faster than Boosting thanks to it's C++ implementation being ~100 times faster than regular Boosting, but made the sacrifice of a worse performance than Boosting.
